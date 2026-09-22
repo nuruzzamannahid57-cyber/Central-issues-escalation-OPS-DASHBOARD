@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ops Console — Carrybee Express</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #1C1B18;
+    --surface: #242220;
+    --surface-2: #2E2B26;
+    --border: #3D3A32;
+    --text: #F2EDE4;
+    --text-dim: #ABA495;
+    --text-faint: #766F60;
+    --accent: #E08A3E;
+    --accent-soft: #E08A3E22;
+    --red: #C4544A;
+    --red-soft: #C4544A22;
+    --green: #7A9B6E;
+    --green-soft: #7A9B6E22;
+    --gold: #D9B34E;
+    --gold-soft: #D9B34E22;
+  }
+  :root[data-theme="light"]{
+    --bg: #F7F5EF;
+    --surface: #FFFFFF;
+    --surface-2: #F1EDE3;
+    --border: #E1DACB;
+    --text: #23211D;
+    --text-dim: #5C5748;
+    --text-faint: #8B8471;
+    --accent: #C9701A;
+    --accent-soft: #C9701A22;
+    --red: #B03B33;
+    --red-soft: #B03B3322;
+    --green: #4F7A45;
+    --green-soft: #4F7A4522;
+    --gold: #A9821E;
+    --gold-soft: #A9821E22;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;transition:background-color .25s, color .25s;}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 20px 80px;}
+  header.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:24px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:var(--accent);}
+  h1{font-family:'Fraunces',serif;font-weight:500;font-size:30px;margin:6px 0 0;letter-spacing:-.01em;}
+
+  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:380px;margin:60px auto 0;}
+  .login-card p.lede{color:var(--text-dim);margin:0 0 22px;font-size:14px;line-height:1.5;}
+  .field{margin-bottom:16px;display:flex;flex-direction:column;gap:7px;}
+  label{font-size:12.5px;font-weight:600;color:var(--text-dim);}
+  input[type=text], textarea, select{
+    background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    padding:11px 12px;border-radius:8px;font-family:'Inter',sans-serif;font-size:14px;
+    outline:none;width:100%;
+  }
+  textarea{resize:vertical;min-height:70px;}
+  button.primary{
+    background:var(--accent);color:#1C1B18;border:none;font-family:'Inter',sans-serif;
+    font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;cursor:pointer;
+  }
+  button.primary:disabled{opacity:.5;cursor:default;}
+  button.ghost{
+    background:transparent;border:1px solid var(--border);color:var(--text-dim);
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13px;padding:9px 16px;
+    border-radius:8px;cursor:pointer;
+  }
+  button.link{background:none;border:none;color:var(--accent);font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;padding:0;}
+  .status-msg{font-size:13.5px;font-weight:600;}
+  .status-msg.err{color:var(--red);}
+  .status-msg.ok{color:var(--green);}
+
+  #view-console{display:none;}
+  .session-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;font-size:12.5px;color:var(--text-faint);flex-wrap:wrap;}
+  .role-badges{display:flex;gap:6px;flex-wrap:wrap;}
+  .role-badge{background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;}
+
+  .issue-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:16px;}
+  .issue-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+  .issue-id{font-family:'Fraunces',serif;font-size:19px;font-weight:500;}
+  .issue-meta{font-size:12px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;}
+  .tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .tag{font-size:11.5px;color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);padding:3px 10px;border-radius:999px;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;}
+  .badge.open{background:var(--red-soft);color:var(--red);}
+  .badge.progress{background:var(--gold-soft);color:var(--gold);}
+  .badge.escalated{background:var(--accent-soft);color:var(--accent);}
+  .badge.resolved{background:var(--green-soft);color:var(--green);}
+  .flag{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;}
+  .flag.regular{background:var(--surface-2);color:var(--text-faint);}
+  .flag.attention{background:var(--gold-soft);color:var(--gold);}
+  .flag.flag-critical{background:#E0803322;color:#E08033;}
+  .flag.very-critical{background:var(--red);color:#fff;animation:flagPulse 1.6s ease-in-out infinite;}
+  @keyframes flagPulse{0%,100%{opacity:1;}50%{opacity:.6;}}
+  .details-text{color:var(--text-dim);font-size:13.5px;line-height:1.5;margin-bottom:14px;}
+  .prior-remark{font-size:12.5px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:10px;margin-top:2px;margin-bottom:14px;}
+  .prior-remark b{color:var(--text-dim);}
+  .update-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .update-row .field{flex:1;min-width:180px;margin-bottom:0;}
+  .update-row select{width:auto;min-width:150px;}
+  .empty-state{padding:50px 10px;text-align:center;color:var(--text-faint);font-size:13.5px;}
+
+  .tab-bar{display:flex;gap:22px;margin-bottom:22px;border-bottom:1px solid var(--border);}
+  .tab-btn{background:none;border:none;color:var(--text-faint);font-family:'Inter',sans-serif;font-weight:600;font-size:13.5px;padding:0 0 12px;cursor:pointer;border-bottom:2px solid transparent;}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .tab-bar.sub{gap:8px;border-bottom:none;margin-bottom:20px;flex-wrap:wrap;}
+  .tab-bar.sub .tab-btn{font-size:12.5px;padding:7px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;color:var(--text-dim);}
+  .tab-bar.sub .tab-btn.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;}
+  .stat-card .num{font-family:'Fraunces',serif;font-size:25px;font-weight:500;line-height:1.1;}
+  .stat-card .lbl{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
+
+  .perf-section-title{font-family:'Fraunces',serif;font-size:17px;font-weight:500;margin:0 0 12px;}
+  .perf-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:26px;}
+  table.perf-table{width:100%;border-collapse:collapse;}
+  .perf-table th,.perf-table td{padding:11px 16px;text-align:left;font-size:13px;border-bottom:1px solid var(--border);}
+  .perf-table th{color:var(--text-faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--surface-2);font-weight:600;}
+  .perf-table tbody tr:last-child td{border-bottom:none;}
+  .perf-table td.num-cell{font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  .rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-dim);}
+  .rank-badge.r1{background:var(--gold-soft);color:var(--gold);}
+  .rank-badge.r2{background:#C0C0C022;color:#C6C6C6;}
+  .rank-badge.r3{background:#CD7F3222;color:#CD9A63;}
+  .rate-pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;}
+  .rate-pill.hi{background:var(--green-soft);color:var(--green);}
+  .rate-pill.mid{background:var(--gold-soft);color:var(--gold);}
+  .rate-pill.lo{background:var(--red-soft);color:var(--red);}
+
+  .report-toggle{display:flex;gap:6px;margin-bottom:14px;}
+  .report-toggle button{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);font-family:'Inter',sans-serif;font-weight:700;font-size:11.5px;padding:6px 14px;border-radius:999px;cursor:pointer;}
+  .report-toggle button.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
+  .chg{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;display:inline-block;}
+  .chg.up{background:var(--red-soft);color:var(--red);}
+  .chg.down{background:var(--green-soft);color:var(--green);}
+  .chg.flat{background:var(--surface-2);color:var(--text-faint);}
+  .perf-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:26px;}
+  .perf-toolbar select{width:auto;min-width:170px;}
+
+  /* From Uiverse.io by rishichawda */
+  #theme-toggle-button{font-size:7px;position:relative;display:inline-block;width:7em;cursor:pointer;flex-shrink:0;}
+  #toggle{opacity:0;width:0;height:0;}
+  #container,#patches,#stars,#button,#sun,#moon,#cloud{
+    transition-property:all;transition-timing-function:cubic-bezier(0.4,0,0.2,1);transition-duration:.25s;
+  }
+  #toggle:checked + svg #container{fill:#2b4360;}
+  #toggle:checked + svg #button{transform:translate(28px, 2.333px);}
+  #sun{opacity:1;}
+  #toggle:checked + svg #sun{opacity:0;}
+  #moon{opacity:0;}
+  #toggle:checked + svg #moon{opacity:1;}
+  #cloud{opacity:1;}
+  #toggle:checked + svg #cloud{opacity:0;}
+  #stars{opacity:0;}
+  #toggle:checked + svg #stars{opacity:1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <span class="eyebrow">CARRYBEE EXPRESS</span>
+      <h1>Ops Console</h1>
+    </div>
+    <label id="theme-toggle-button">
+      <input type="checkbox" id="toggle">
+      <svg viewBox="0 0 69.667 44" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(3.5 3.5)" data-name="Component 15 – 1" id="Component_15_1">
+          <g filter="url(#container)" transform="matrix(1, 0, 0, 1, -3.5, -3.5)">
+            <rect fill="#83cbd8" transform="translate(3.5 3.5)" rx="17.5" height="35" width="60.667" data-name="container" id="container"></rect>
+          </g>
+          <g transform="translate(2.333 2.333)" id="button">
+            <g data-name="sun" id="sun">
+              <g filter="url(#sun-outer)" transform="matrix(1, 0, 0, 1, -5.83, -5.83)">
+                <circle fill="#f8e664" transform="translate(5.83 5.83)" r="15.167" cy="15.167" cx="15.167" data-name="sun-outer" id="sun-outer-2"></circle>
+              </g>
+              <g filter="url(#sun)" transform="matrix(1, 0, 0, 1, -5.83, -5.83)">
+                <path fill="rgba(246,254,247,0.29)" transform="translate(9.33 9.33)" d="M11.667,0A11.667,11.667,0,1,1,0,11.667,11.667,11.667,0,0,1,11.667,0Z" data-name="sun" id="sun-3"></path>
+              </g>
+              <circle fill="#fcf4b9" transform="translate(8.167 8.167)" r="7" cy="7" cx="7" id="sun-inner"></circle>
+            </g>
+            <g data-name="moon" id="moon">
+              <g filter="url(#moon)" transform="matrix(1, 0, 0, 1, -31.5, -5.83)">
+                <circle fill="#cce6ee" transform="translate(31.5 5.83)" r="15.167" cy="15.167" cx="15.167" data-name="moon" id="moon-3"></circle>
+              </g>
+              <g fill="#a6cad0" transform="translate(-24.415 -1.009)" id="patches">
+                <circle transform="translate(43.009 4.496)" r="2" cy="2" cx="2"></circle>
+                <circle transform="translate(39.366 17.952)" r="2" cy="2" cx="2" data-name="patch"></circle>
+                <circle transform="translate(33.016 8.044)" r="1" cy="1" cx="1" data-name="patch"></circle>
+                <circle transform="translate(51.081 18.888)" r="1" cy="1" cx="1" data-name="patch"></circle>
+                <circle transform="translate(33.016 22.503)" r="1" cy="1" cx="1" data-name="patch"></circle>
+                <circle transform="translate(50.081 10.53)" r="1.5" cy="1.5" cx="1.5" data-name="patch"></circle>
+              </g>
+            </g>
+          </g>
+          <g filter="url(#cloud)" transform="matrix(1, 0, 0, 1, -3.5, -3.5)">
+            <path fill="#fff" transform="translate(-3466.47 -160.94)" d="M3512.81,173.815a4.463,4.463,0,0,1,2.243.62.95.95,0,0,1,.72-1.281,4.852,4.852,0,0,1,2.623.519c.034.02-.5-1.968.281-2.716a2.117,2.117,0,0,1,2.829-.274,1.821,1.821,0,0,1,.854,1.858c.063.037,2.594-.049,3.285,1.273s-.865,2.544-.807,2.626a12.192,12.192,0,0,1,2.278.892c.553.448,1.106,1.992-1.62,2.927a7.742,7.742,0,0,1-3.762-.3c-1.28-.49-1.181-2.65-1.137-2.624s-1.417,2.2-2.623,2.2a4.172,4.172,0,0,1-2.394-1.206,3.825,3.825,0,0,1-2.771.774c-3.429-.46-2.333-3.267-2.2-3.55A3.721,3.721,0,0,1,3512.81,173.815Z" data-name="cloud" id="cloud"></path>
+          </g>
+          <g fill="#def8ff" transform="translate(3.585 1.325)" id="stars">
+            <path transform="matrix(-1, 0.017, -0.017, -1, 24.231, 3.055)" d="M.774,0,.566.559,0,.539.458.933.25,1.492l.485-.361.458.394L1.024.953,1.509.592.943.572Z"></path>
+            <path transform="matrix(-0.777, 0.629, -0.629, -0.777, 23.185, 12.358)" d="M1.341.529.836.472.736,0,.505.46,0,.4.4.729l-.231.46L.605.932l.4.326L.9.786Z" data-name="star"></path>
+            <path transform="matrix(0.438, 0.899, -0.899, 0.438, 23.177, 29.735)" d="M.015,1.065.475.9l.285.365L.766.772l.46-.164L.745.494.751,0,.481.407,0,.293.285.658Z" data-name="star"></path>
+            <path transform="translate(12.677 0.388) rotate(104)" d="M1.161,1.6,1.059,1,1.574.722.962.607.86,0,.613.572,0,.457.446.881.2,1.454l.516-.274Z" data-name="star"></path>
+            <path transform="matrix(-0.07, 0.998, -0.998, -0.07, 11.066, 15.457)" d="M.873,1.648l.114-.62L1.579.945,1.03.62,1.144,0,.706.464.157.139.438.7,0,1.167l.592-.083Z" data-name="star"></path>
+            <path transform="translate(8.326 28.061) rotate(11)" d="M.593,0,.638.724,0,.982l.7.211.045.724.36-.64.7.211L1.342.935,1.7.294,1.063.552Z" data-name="star"></path>
+            <path transform="translate(5.012 5.962) rotate(172)" d="M.816,0,.5.455,0,.311.323.767l-.312.455.516-.215.323.456L.827.911,1.343.7.839.552Z" data-name="star"></path>
+            <path transform="translate(2.218 14.616) rotate(169)" d="M1.261,0,.774.571.114.3.487.967,0,1.538.728,1.32l.372.662.047-.749.728-.218L1.215.749Z" data-name="star"></path>
+          </g>
+        </g>
+      </svg>
+    </label>
+  </header>
+
+  <div id="view-login" class="login-card">
+    <p class="lede">Sign in with your Carrybee login to see issues under your hub(s).</p>
+    <form id="loginForm">
+      <div class="field">
+        <label>Email</label>
+        <input type="text" id="l-email" required placeholder="you@carrybee.com">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="text" id="l-password" required placeholder="Password">
+      </div>
+      <button type="submit" class="primary">Sign in</button>
+      <div style="margin-top:12px;"><span id="loginMsg" class="status-msg"></span></div>
+    </form>
+  </div>
+
+  <div id="view-console">
+    <div class="session-row">
+      <div class="role-badges" id="roleBadges"></div>
+      <div><span id="sessionLabel"></span> &nbsp;·&nbsp; <button class="link" id="btnLogout">Sign out</button></div>
+    </div>
+
+    <div class="tab-bar" id="mainTabs" style="display:none;">
+      <button class="tab-btn active" data-tab="issues" id="tabBtnIssues">Issues</button>
+      <button class="tab-btn" data-tab="flagged" id="tabBtnFlagged" style="display:none;">Flagged</button>
+      <button class="tab-btn" data-tab="performance" id="tabBtnPerformance" style="display:none;">Performance</button>
+    </div>
+
+    <div id="panel-issues">
+      <div id="issueList"></div>
+      <div id="emptyState" class="empty-state" style="display:none;">No issues are logged under your hub(s) right now.</div>
+    </div>
+
+    <div id="panel-flagged" style="display:none;">
+      <div id="flaggedList"></div>
+      <div id="flaggedEmptyState" class="empty-state" style="display:none;">Nothing flagged right now — everything under you is on time.</div>
+    </div>
+
+    <div id="panel-performance" style="display:none;">
+      <div class="tab-bar sub" id="perfSubTabs">
+        <button class="tab-btn active" data-zone="central">Central / CTG</button>
+        <button class="tab-btn" data-zone="isd">ISD &amp; Sub</button>
+        <button class="tab-btn" data-zone="osd">OSD</button>
+      </div>
+      <div id="perfContent"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'https://central-issues-log.onrender.com';
+
+  // ---------- Light / dark theme ----------
+  (function initTheme(){
+    const THEME_KEY = 'cbe_theme';
+    const toggle = document.getElementById('toggle');
+    function applyTheme(theme){
+      if(theme === 'light'){ document.documentElement.setAttribute('data-theme', 'light'); }
+      else{ document.documentElement.removeAttribute('data-theme'); }
+    }
+    const saved = localStorage.getItem(THEME_KEY) || 'dark';
+    applyTheme(saved);
+    toggle.checked = saved === 'dark';
+    toggle.addEventListener('change', ()=>{
+      const theme = toggle.checked ? 'dark' : 'light';
+      applyTheme(theme);
+      localStorage.setItem(THEME_KEY, theme);
+    });
+  })();
+
+  let authToken = localStorage.getItem('cbe_token') || null;
+  let authEmail = localStorage.getItem('cbe_email') || null;
+  let authName = localStorage.getItem('cbe_name') || null;
+
+  const $ = (id) => document.getElementById(id);
+  const statusClass = (s) => s === 'Open' ? 'open' : s === 'In Progress' ? 'progress' : s === 'Escalated' ? 'escalated' : 'resolved';
+  const FLAG_CLASS = { 'Regular': 'regular', 'Need attention': 'attention', 'Critical': 'flag-critical', 'Very critical': 'very-critical', 'Resolved': null };
+  const FLAG_ICON = { 'Regular': '', 'Need attention': '🚩', 'Critical': '🚩', 'Very critical': '🚩' };
+  function renderFlag(i){
+    const cls = FLAG_CLASS[i.response_status];
+    if(!cls) return '';
+    return `<span class="flag ${cls}">${FLAG_ICON[i.response_status]||''} ${escapeHtml(i.response_status)} · ${escapeHtml(i.escalation_level||'')}</span>`;
+  }
+  const ROLE_LABELS = { hub: 'Hub', ops_manager: 'Ops Manager', regional_manager: 'Regional Manager', cluster_lead: 'Cluster Lead' };
+
+  let myRoles = [];
+  let allIssues = [];
+  let activePerfZone = 'central';
+  let activeReportPeriod = 'day';
+
+  function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function startOfWeek(d){
+    const day = d.getDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + diff);
+    return startOfDay(monday);
+  }
+  function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+
+  function bucketIssues(issues, granularity){
+    const buckets = {};
+    issues.forEach(i=>{
+      if(!i.ts) return;
+      const d = new Date(i.ts);
+      if(isNaN(d.getTime())) return;
+      let key, label, sortKey;
+      if(granularity === 'day'){
+        const s = startOfDay(d);
+        sortKey = s.getTime();
+        key = s.toISOString().slice(0,10);
+        label = s.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
+      } else if(granularity === 'week'){
+        const s = startOfWeek(d);
+        sortKey = s.getTime();
+        key = s.toISOString().slice(0,10);
+        label = 'Wk of ' + s.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
+      } else {
+        const s = startOfMonth(d);
+        sortKey = s.getTime();
+        key = s.toISOString().slice(0,7);
+        label = s.toLocaleDateString('en-GB', {month:'short', year:'numeric'});
+      }
+      if(!buckets[key]) buckets[key] = { key, label, sortKey, count:0, solved:0 };
+      buckets[key].count += 1;
+      if(i.status === 'Resolved') buckets[key].solved += 1;
+    });
+    return Object.values(buckets).sort((a,b)=> b.sortKey - a.sortKey);
+  }
+
+  function renderTrendTable(zone, period){
+    const zoneIssues = allIssues.filter(i => classifyZone(i.zone) === zone);
+    const allBuckets = bucketIssues(zoneIssues, period);
+    const limit = period === 'day' ? 7 : period === 'week' ? 8 : 6;
+    const shown = allBuckets.slice(0, limit);
+    if(!shown.length) return `<div class="empty-state">Not enough dated issues yet for this report.</div>`;
+    const rows = shown.map((b, idx) => {
+      const prev = allBuckets[idx+1];
+      let chgHtml = '<span class="chg flat">—</span>';
+      if(prev){
+        const diff = b.count - prev.count;
+        if(diff > 0) chgHtml = `<span class="chg up">▲ ${diff}</span>`;
+        else if(diff < 0) chgHtml = `<span class="chg down">▼ ${Math.abs(diff)}</span>`;
+        else chgHtml = `<span class="chg flat">flat</span>`;
+      }
+      const rate = b.count ? Math.round((b.solved / b.count) * 100) : 0;
+      return `<tr>
+        <td>${escapeHtml(b.label)}</td>
+        <td class="num-cell">${b.count}</td>
+        <td class="num-cell">${b.solved}</td>
+        <td><span class="rate-pill ${ratePillClass(rate)}">${rate}%</span></td>
+        <td>${chgHtml}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="perf-table-wrap">
+      <table class="perf-table">
+        <thead><tr><th>Period</th><th>Issues</th><th>Solved</th><th>Resolve rate</th><th>Chg vs prior</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+
+  function csvEscape(val){
+    const s = String(val ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  }
+
+  function exportPerformanceCSV(zone, hub){
+    let issues = allIssues.filter(i => classifyZone(i.zone) === zone);
+    if(hub && hub !== 'all') issues = issues.filter(i => (i.hub && i.hub !== '—' ? i.hub : 'Unassigned') === hub);
+    const headers = ['Consignment','Hub','Zone','Category','Subcategory','Status','Logged By','Remarks','Timestamp'];
+    const rows = issues.map(i => [
+      i.consignment || '',
+      (i.hub && i.hub !== '—') ? i.hub : 'Unassigned',
+      i.zone || '',
+      i.category || '',
+      i.subcategory || '',
+      i.status || '',
+      i.logged_by_name || i.logged_by || '',
+      i.remarks || '',
+      i.ts || ''
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const hubLabel = (hub && hub !== 'all') ? hub.replace(/\s+/g,'_') : 'all-hubs';
+    a.href = url;
+    a.download = `issues-${zone}-${hubLabel}-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function classifyZone(zone){
+    const z = (zone||'').toLowerCase();
+    if(z.includes('isd') || z.includes('sub')) return 'isd';
+    if(z.includes('osd')) return 'osd';
+    return 'central';
+  }
+
+  function computeHubStats(issues){
+    const byHub = {};
+    issues.forEach(i=>{
+      const hub = i.hub && i.hub !== '—' ? i.hub : 'Unassigned';
+      if(!byHub[hub]) byHub[hub] = { hub, total:0, remarks:0, solved:0 };
+      byHub[hub].total += 1;
+      if(i.remarks && String(i.remarks).trim()) byHub[hub].remarks += 1;
+      if(i.status === 'Resolved') byHub[hub].solved += 1;
+    });
+    return Object.values(byHub).map(h => ({
+      ...h,
+      rate: h.total ? Math.round((h.solved / h.total) * 100) : 0
+    })).sort((a,b)=> b.total - a.total);
+  }
+
+  function ratePillClass(rate){
+    if(rate >= 70) return 'hi';
+    if(rate >= 40) return 'mid';
+    return 'lo';
+  }
+
+  function renderPerformance(zone){
+    activePerfZone = zone;
+    document.querySelectorAll('#perfSubTabs .tab-btn').forEach(b=>{
+      b.classList.toggle('active', b.dataset.zone === zone);
+    });
+
+    const zoneIssues = allIssues.filter(i => classifyZone(i.zone) === zone);
+    const hubStats = computeHubStats(zoneIssues);
+    const totalIssues = zoneIssues.length;
+    const totalRemarks = hubStats.reduce((s,h)=>s+h.remarks, 0);
+    const totalSolved = hubStats.reduce((s,h)=>s+h.solved, 0);
+    const hubCount = hubStats.length;
+    const avgPerHub = hubCount ? (totalIssues / hubCount).toFixed(1) : '0.0';
+    const overallRate = totalIssues ? Math.round((totalSolved / totalIssues) * 100) : 0;
+
+    const content = $('perfContent');
+    if(!hubCount){
+      content.innerHTML = `<div class="empty-state">No issues logged for this zone yet.</div>`;
+      return;
+    }
+
+    const medalClass = (idx) => idx === 0 ? 'r1' : idx === 1 ? 'r2' : idx === 2 ? 'r3' : '';
+
+    content.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num">${totalIssues}</div><div class="lbl">Total issues</div></div>
+        <div class="stat-card"><div class="num">${totalRemarks}</div><div class="lbl">Remarks logged</div></div>
+        <div class="stat-card"><div class="num">${totalSolved}</div><div class="lbl">Solved</div></div>
+        <div class="stat-card"><div class="num">${hubCount}</div><div class="lbl">Hubs reporting</div></div>
+        <div class="stat-card"><div class="num">${avgPerHub}</div><div class="lbl">Avg issues / hub</div></div>
+        <div class="stat-card"><div class="num">${overallRate}%</div><div class="lbl">Overall resolve rate</div></div>
+      </div>
+
+      <div class="perf-section-title">Hub Leaderboard</div>
+      <div class="perf-table-wrap">
+        <table class="perf-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Hub</th><th>Issues</th><th>Remarks</th><th>Solved</th><th>Resolve rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${hubStats.map((h, idx) => `
+              <tr>
+                <td><span class="rank-badge ${medalClass(idx)}">${idx+1}</span></td>
+                <td>${escapeHtml(h.hub)}</td>
+                <td class="num-cell">${h.total}</td>
+                <td class="num-cell">${h.remarks}</td>
+                <td class="num-cell">${h.solved}</td>
+                <td><span class="rate-pill ${ratePillClass(h.rate)}">${h.rate}%</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="perf-section-title">Trend Report</div>
+      <div class="report-toggle" id="reportToggle">
+        <button data-period="day" title="Day over Day" class="${activeReportPeriod==='day'?'active':''}">DOD</button>
+        <button data-period="week" title="Week over Week" class="${activeReportPeriod==='week'?'active':''}">WOW</button>
+        <button data-period="month" title="Month over Month" class="${activeReportPeriod==='month'?'active':''}">MOM</button>
+      </div>
+      <div id="trendTableWrap">${renderTrendTable(zone, activeReportPeriod)}</div>
+
+      <div class="perf-section-title">Export</div>
+      <div class="perf-toolbar">
+        <select id="exportHubSelect">
+          <option value="all">All hubs (this zone)</option>
+          ${hubStats.map(h => `<option value="${escapeHtml(h.hub)}">${escapeHtml(h.hub)}</option>`).join('')}
+        </select>
+        <button class="ghost" id="exportCsvBtn">Export CSV</button>
+      </div>
+    `;
+
+    document.querySelectorAll('#reportToggle button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        activeReportPeriod = btn.dataset.period;
+        document.querySelectorAll('#reportToggle button').forEach(b=> b.classList.toggle('active', b === btn));
+        $('trendTableWrap').innerHTML = renderTrendTable(zone, activeReportPeriod);
+      });
+    });
+    $('exportCsvBtn').addEventListener('click', ()=>{
+      exportPerformanceCSV(zone, $('exportHubSelect').value);
+    });
+  }
+
+  function switchMainTab(tab){
+    $('tabBtnIssues').classList.toggle('active', tab === 'issues');
+    $('tabBtnFlagged').classList.toggle('active', tab === 'flagged');
+    $('tabBtnPerformance').classList.toggle('active', tab === 'performance');
+    $('panel-issues').style.display = tab === 'issues' ? 'block' : 'none';
+    $('panel-flagged').style.display = tab === 'flagged' ? 'block' : 'none';
+    $('panel-performance').style.display = tab === 'performance' ? 'block' : 'none';
+    if(tab === 'flagged') renderFlagged();
+    if(tab === 'performance') renderPerformance(activePerfZone);
+  }
+
+  $('tabBtnIssues').addEventListener('click', ()=> switchMainTab('issues'));
+  $('tabBtnFlagged').addEventListener('click', ()=> switchMainTab('flagged'));
+  $('tabBtnPerformance').addEventListener('click', ()=> switchMainTab('performance'));
+  document.querySelectorAll('#perfSubTabs .tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> renderPerformance(btn.dataset.zone));
+  });
+
+  // remarks_by is stored as a raw email (the backend has no name lookup for
+  // it); show the signed-in user's own name when the remark was theirs, since
+  // that's the one case we can resolve client-side without a new endpoint.
+  function remarksByLabel(email){
+    if(!email) return '';
+    if(authName && email === authEmail) return authName;
+    return email;
+  }
+
+  function escapeHtml(s){
+    return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmtTime(iso){
+    if(!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  }
+
+  async function authedFetch(path, opts={}){
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...opts,
+      headers: {
+        'Content-Type':'application/json',
+        'Authorization': `Bearer ${authToken}`,
+        ...(opts.headers||{})
+      }
+    });
+    if(res.status === 401){ doLogout(); throw new Error('Session expired'); }
+    return res;
+  }
+
+  function doLogout(){
+    authToken = null; authEmail = null; authName = null;
+    localStorage.removeItem('cbe_token'); localStorage.removeItem('cbe_email'); localStorage.removeItem('cbe_name');
+    $('view-console').style.display = 'none';
+    $('view-login').style.display = 'block';
+  }
+
+  $('loginForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const msg = $('loginMsg');
+    msg.textContent = 'Signing in…'; msg.className = 'status-msg';
+    try{
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email: $('l-email').value.trim(), password: $('l-password').value, app: 'ops' })
+      });
+      const data = await res.json();
+      if(!res.ok){ msg.textContent = data.error || 'Sign in failed.'; msg.classList.add('err'); return; }
+      authToken = data.token; authEmail = data.email; authName = data.name || null;
+      localStorage.setItem('cbe_token', authToken);
+      localStorage.setItem('cbe_email', authEmail);
+      if(authName) localStorage.setItem('cbe_name', authName);
+      await enterConsole();
+    }catch(err){
+      msg.textContent = 'Could not reach the server.'; msg.classList.add('err');
+    }
+  });
+  $('btnLogout').addEventListener('click', doLogout);
+
+  async function enterConsole(){
+    $('sessionLabel').textContent = authName || authEmail;
+    $('view-login').style.display = 'none';
+    $('view-console').style.display = 'block';
+
+    const meRes = await authedFetch('/api/ops/me');
+    const me = await meRes.json();
+    myRoles = me.roles || [];
+    $('roleBadges').innerHTML = myRoles.map(r=>`<span class="role-badge">${ROLE_LABELS[r]||r}</span>`).join('')
+      || '<span class="role-badge" style="background:var(--red-soft);color:var(--red);">No hub assigned</span>';
+
+    const isOpsManager = myRoles.includes('ops_manager');
+    const canSeeFlagged = myRoles.some(r => ['cluster_lead', 'regional_manager', 'ops_manager'].includes(r));
+    $('mainTabs').style.display = (isOpsManager || canSeeFlagged) ? 'flex' : 'none';
+    $('tabBtnFlagged').style.display = canSeeFlagged ? 'inline-block' : 'none';
+    $('tabBtnPerformance').style.display = isOpsManager ? 'inline-block' : 'none';
+    switchMainTab('issues');
+
+    await loadIssues();
+  }
+
+  async function loadIssues(){
+    const res = await authedFetch('/api/ops/issues');
+    const issues = await res.json();
+    allIssues = issues;
+    renderIssues(issues, 'issueList', 'emptyState');
+    if($('panel-flagged').style.display === 'block') renderFlagged();
+    if($('panel-performance').style.display === 'block') renderPerformance(activePerfZone);
+  }
+
+  // Higher severity first (Very critical > Critical > Need attention), and
+  // within the same severity, whichever has been stuck longest goes first.
+  const SEVERITY_RANK = { 'Very critical': 3, 'Critical': 2, 'Need attention': 1 };
+  function renderFlagged(){
+    const flagged = allIssues
+      .filter(i => SEVERITY_RANK[i.response_status])
+      .sort((a, b) => {
+        const rankDiff = SEVERITY_RANK[b.response_status] - SEVERITY_RANK[a.response_status];
+        if(rankDiff) return rankDiff;
+        return new Date(a.level_started_at || a.ts) - new Date(b.level_started_at || b.ts);
+      });
+    renderIssues(flagged, 'flaggedList', 'flaggedEmptyState');
+  }
+
+  function renderIssues(issues, listId, emptyId){
+    const list = $(listId);
+    list.innerHTML = '';
+    $(emptyId).style.display = issues.length ? 'none' : 'block';
+    issues.forEach(i=>{
+      const card = document.createElement('div');
+      card.className = 'issue-card';
+      card.innerHTML = `
+        <div class="issue-top">
+          <div class="issue-id">${escapeHtml(i.consignment)}</div>
+          <div class="issue-meta">${fmtTime(i.ts)} · logged by ${escapeHtml(i.logged_by_name || i.logged_by)}</div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">${escapeHtml(i.channel)}</span>
+          <span class="tag">${escapeHtml(i.zone)}</span>
+          <span class="tag">${escapeHtml(i.hub||'—')}</span>
+          <span class="tag">${escapeHtml(i.category)}</span>
+          <span class="tag">${escapeHtml(i.subcategory)}</span>
+          <span class="badge ${statusClass(i.status)}">${escapeHtml(i.status)}</span>
+          ${renderFlag(i)}
+        </div>
+        <div class="details-text">${escapeHtml(i.details)}</div>
+        ${i.remarks ? `<div class="prior-remark"><b>Last remark</b> (${escapeHtml(remarksByLabel(i.remarks_by))}, ${fmtTime(i.updated_at)}): ${escapeHtml(i.remarks)}</div>` : ''}
+        <div class="update-row">
+          <div class="field">
+            <label>Remark</label>
+            <textarea placeholder="What's the update on this issue?" data-role="remark"></textarea>
+          </div>
+          <div class="field" style="flex:0 0 auto;">
+            <label>Status</label>
+            <select data-role="status">
+              <option value="Open" ${i.status==='Open'?'selected':''}>Open</option>
+              <option value="In Progress" ${i.status==='In Progress'?'selected':''}>In Progress</option>
+              <option value="Escalated" ${i.status==='Escalated'?'selected':''}>Escalated</option>
+              <option value="Resolved" ${i.status==='Resolved'?'selected':''}>Resolved</option>
+            </select>
+          </div>
+          <button class="primary" data-role="submit">Save update</button>
+        </div>
+        <div style="margin-top:8px;"><span class="status-msg" data-role="msg"></span></div>
+      `;
+      card.querySelector('[data-role=submit]').addEventListener('click', async ()=>{
+        const btn = card.querySelector('[data-role=submit]');
+        const msgEl = card.querySelector('[data-role=msg]');
+        const remark = card.querySelector('[data-role=remark]').value.trim();
+        const status = card.querySelector('[data-role=status]').value;
+        btn.disabled = true; msgEl.textContent = 'Saving…'; msgEl.className = 'status-msg';
+        try{
+          const res = await authedFetch(`/api/ops/issues/${encodeURIComponent(i.id)}`, {
+            method:'PATCH',
+            body: JSON.stringify({ status, remarks: remark || null })
+          });
+          const data = await res.json();
+          if(!res.ok){ msgEl.textContent = data.error || 'Could not save.'; msgEl.classList.add('err'); btn.disabled=false; return; }
+          msgEl.textContent = 'Saved.'; msgEl.classList.add('ok');
+          await loadIssues();
+        }catch(err){
+          msgEl.textContent = 'Could not reach the server.'; msgEl.classList.add('err'); btn.disabled=false;
+        }
+      });
+      list.appendChild(card);
+    });
+  }
+
+  if(authToken){ enterConsole(); } else { $('view-login').style.display = 'block'; }
+</script>
+</body>
+</html>
