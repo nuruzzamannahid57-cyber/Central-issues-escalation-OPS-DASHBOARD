@@ -126,8 +126,7 @@
   .perf-table th,.perf-table td{white-space:nowrap;}
   .breach-num{color:var(--red);font-weight:700;}
   .stat-card.breach .num{color:var(--red);}
-  .trend-totals-note{font-size:11.5px;color:var(--text-faint);margin:2px 0 10px;}
-  .trend-totals{margin-bottom:16px;}
+  .perf-table tfoot td{font-weight:700;background:var(--surface-2);border-top:2px solid var(--border);border-bottom:none;}
   .stat-card .sub{font-size:11px;color:var(--text-dim);margin-top:4px;}
   .stat-card.lvl-l1 .num{color:var(--red);}
   .stat-card.lvl-l2 .num{color:var(--gold);}
@@ -387,8 +386,8 @@
     const shown = allBuckets.slice(0, limit);
     if(!shown.length) return `<div class="empty-state">Not enough dated issues yet for this report.</div>`;
     const totals = emptyCounts();
-    shown.forEach(b => { totals.total += b.total; totals.breach += b.breach; totals.solved += b.solved; totals.closed += b.closed; });
-    const unit = period === 'day' ? 'day' : period === 'week' ? 'week' : 'month';
+    shown.forEach(b => { Object.keys(totals).forEach(k => { totals[k] += b[k]; }); });
+    const totalRate = resolveRate(totals);
     const rows = shown.map((b, idx) => {
       const prev = allBuckets[idx+1];
       let chgHtml = '<span class="chg flat">—</span>';
@@ -407,17 +406,19 @@
         <td>${chgHtml}</td>
       </tr>`;
     }).join('');
-    return `<div class="trend-totals-note">Totals across the ${shown.length} ${unit}${shown.length === 1 ? '' : 's'} shown below</div>
-    <div class="stat-grid trend-totals">
-      <div class="stat-card"><div class="num">${totals.total}</div><div class="lbl">Total issues</div></div>
-      <div class="stat-card ${totals.breach ? 'breach' : ''}"><div class="num">${totals.breach}</div><div class="lbl">Total SLA breached</div></div>
-      <div class="stat-card"><div class="num">${totals.solved}</div><div class="lbl">Total solved</div></div>
-      <div class="stat-card"><div class="num">${totals.closed}</div><div class="lbl">Total closed</div></div>
-    </div>
-    <div class="perf-table-wrap">
+    return `<div class="perf-table-wrap">
       <table class="perf-table">
         <thead><tr><th>Period</th>${COUNT_HEADS}<th>Closed</th><th>Resolve rate</th><th>Chg vs prior</th></tr></thead>
         <tbody>${rows}</tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>Total</td>
+            ${countCells(totals)}
+            <td class="num-cell">${totals.closed}</td>
+            <td><span class="rate-pill ${ratePillClass(totalRate)}">${totalRate}%</span></td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
     </div>`;
   }
