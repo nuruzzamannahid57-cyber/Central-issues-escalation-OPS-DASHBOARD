@@ -84,7 +84,6 @@
   .issue-meta{font-size:12px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;}
   .tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
   .tag{font-size:11.5px;color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);padding:3px 10px;border-radius:999px;}
-  .tag.reesc{background:var(--gold-soft);color:var(--gold);border-color:transparent;font-weight:700;}
   .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;}
   .badge.open{background:var(--red-soft);color:var(--red);}
   .badge.progress{background:var(--gold-soft);color:var(--gold);}
@@ -117,19 +116,12 @@
   .stat-card .lbl{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
 
   .perf-section-title{font-family:'Fraunces',serif;font-size:17px;font-weight:500;margin:0 0 12px;}
-  .perf-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow-x:auto;margin-bottom:26px;}
+  .perf-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:26px;}
   table.perf-table{width:100%;border-collapse:collapse;}
   .perf-table th,.perf-table td{padding:11px 16px;text-align:left;font-size:13px;border-bottom:1px solid var(--border);}
   .perf-table th{color:var(--text-faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--surface-2);font-weight:600;}
   .perf-table tbody tr:last-child td{border-bottom:none;}
   .perf-table td.num-cell{font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
-  .perf-table th,.perf-table td{white-space:nowrap;}
-  .breach-num{color:var(--red);font-weight:700;}
-  .stat-card.breach .num{color:var(--red);}
-  .perf-table tfoot td{font-weight:700;background:var(--surface-2);border-top:2px solid var(--border);border-bottom:none;}
-  .stat-card .sub{font-size:11px;color:var(--text-dim);margin-top:4px;}
-  .stat-card.lvl-l1 .num{color:var(--red);}
-  .stat-card.lvl-l2 .num{color:var(--gold);}
   .rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-dim);}
   .rank-badge.r1{background:var(--gold-soft);color:var(--gold);}
   .rank-badge.r2{background:#C0C0C022;color:#C6C6C6;}
@@ -165,6 +157,15 @@
   #toggle:checked + svg #cloud{opacity:0;}
   #stars{opacity:0;}
   #toggle:checked + svg #stars{opacity:1;}
+
+  .lightbox-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:110;
+    display:flex;align-items:center;justify-content:center;padding:30px;
+  }
+  .lightbox-overlay img{max-width:100%;max-height:85vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .lightbox-close{position:absolute;top:18px;right:22px;background:none;border:none;color:#fff;font-size:28px;line-height:1;cursor:pointer;opacity:.8;}
+  .lightbox-close:hover{opacity:1;}
+  .attach-broken{width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:var(--surface-2,#333);border:1px dashed var(--border,#555);border-radius:6px;font-size:11px;}
 </style>
 </head>
 <body>
@@ -223,6 +224,11 @@
     </label>
   </header>
 
+  <div id="lightboxOverlay" class="lightbox-overlay" style="display:none;">
+    <button class="lightbox-close" id="lightboxClose">✕</button>
+    <img id="lightboxImg" src="" alt="Attachment">
+  </div>
+
   <div id="view-login" class="login-card">
     <p class="lede">Sign in with your Carrybee login to see issues under your hub(s).</p>
     <form id="loginForm">
@@ -257,7 +263,6 @@
     </div>
 
     <div id="panel-flagged" style="display:none;">
-      <div class="stat-grid" id="flaggedLevelCards"></div>
       <div id="flaggedList"></div>
       <div id="flaggedEmptyState" class="empty-state" style="display:none;">Nothing flagged right now — everything under you is on time.</div>
     </div>
@@ -299,6 +304,9 @@
   let authName = localStorage.getItem('cbe_name') || null;
 
   const $ = (id) => document.getElementById(id);
+  // 'escalated' kept only so any pre-existing issue still carrying that
+  // legacy status renders with a sensible badge — it's no longer a
+  // selectable status going forward (see the update-row <select> above).
   const statusClass = (s) => s === 'Open' ? 'open' : s === 'In Progress' ? 'progress' : s === 'Escalated' ? 'escalated' : 'resolved';
   const FLAG_CLASS = { 'Regular': 'regular', 'Need attention': 'attention', 'Critical': 'flag-critical', 'Very critical': 'very-critical', 'Resolved': null };
   const FLAG_ICON = { 'Regular': '', 'Need attention': '🚩', 'Critical': '🚩', 'Very critical': '🚩' };
@@ -328,11 +336,29 @@
     const list = parseAttachments(i);
     if (!list.length) return '';
     return `<div class="attach-row" style="margin:8px 0;display:flex;flex-wrap:wrap;gap:6px;">` +
-      list.map(a => a.type === 'photo'
-        ? `<a href="${a.dataUrl}" target="_blank" rel="noopener"><img src="${a.dataUrl}" alt="attachment" style="width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid var(--border,#333);"></a>`
+      list.map((a, idx) => a.type === 'photo'
+        ? `<img src="${a.dataUrl}" alt="attachment" class="attach-thumb" data-issue="${i.id}" data-idx="${idx}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid var(--border,#333);cursor:pointer;" onerror="this.outerHTML='<div class=&quot;attach-broken&quot; title=&quot;Photo failed to load&quot;>🖼️ ⚠️</div>';">`
         : `<audio controls src="${a.dataUrl}" style="height:30px;max-width:180px;"></audio>`
       ).join('') + `</div>`;
   }
+
+  // Same reasoning as the KAM dashboard: view photos in an in-app lightbox,
+  // never by navigating the tab to a (very long) data: URI directly.
+  function openLightbox(dataUrl){
+    $('lightboxImg').src = dataUrl;
+    $('lightboxOverlay').style.display = 'flex';
+  }
+  function closeLightbox(){
+    $('lightboxOverlay').style.display = 'none';
+    $('lightboxImg').src = '';
+  }
+  $('lightboxClose').addEventListener('click', closeLightbox);
+  $('lightboxOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'lightboxOverlay') closeLightbox(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeLightbox(); });
+  document.addEventListener('click', (e)=>{
+    const thumb = e.target.closest('.attach-thumb');
+    if(thumb) openLightbox(thumb.src);
+  });
   const ROLE_LABELS = { hub: 'Hub', ops_manager: 'Ops Manager', regional_manager: 'Regional Manager', cluster_lead: 'Cluster Lead' };
 
   let myRoles = [];
@@ -373,8 +399,9 @@
         key = s.toISOString().slice(0,7);
         label = s.toLocaleDateString('en-GB', {month:'short', year:'numeric'});
       }
-      if(!buckets[key]) buckets[key] = { key, label, sortKey, ...emptyCounts() };
-      tally(buckets[key], i);
+      if(!buckets[key]) buckets[key] = { key, label, sortKey, count:0, solved:0 };
+      buckets[key].count += 1;
+      if(i.status === 'Resolved') buckets[key].solved += 1;
     });
     return Object.values(buckets).sort((a,b)=> b.sortKey - a.sortKey);
   }
@@ -385,40 +412,28 @@
     const limit = period === 'day' ? 7 : period === 'week' ? 8 : 6;
     const shown = allBuckets.slice(0, limit);
     if(!shown.length) return `<div class="empty-state">Not enough dated issues yet for this report.</div>`;
-    const totals = emptyCounts();
-    shown.forEach(b => { Object.keys(totals).forEach(k => { totals[k] += b[k]; }); });
-    const totalRate = resolveRate(totals);
     const rows = shown.map((b, idx) => {
       const prev = allBuckets[idx+1];
       let chgHtml = '<span class="chg flat">—</span>';
       if(prev){
-        const diff = b.total - prev.total;
+        const diff = b.count - prev.count;
         if(diff > 0) chgHtml = `<span class="chg up">▲ ${diff}</span>`;
         else if(diff < 0) chgHtml = `<span class="chg down">▼ ${Math.abs(diff)}</span>`;
         else chgHtml = `<span class="chg flat">flat</span>`;
       }
-      const rate = resolveRate(b);
+      const rate = b.count ? Math.round((b.solved / b.count) * 100) : 0;
       return `<tr>
         <td>${escapeHtml(b.label)}</td>
-        ${countCells(b)}
-        <td class="num-cell">${b.closed}</td>
+        <td class="num-cell">${b.count}</td>
+        <td class="num-cell">${b.solved}</td>
         <td><span class="rate-pill ${ratePillClass(rate)}">${rate}%</span></td>
         <td>${chgHtml}</td>
       </tr>`;
     }).join('');
     return `<div class="perf-table-wrap">
       <table class="perf-table">
-        <thead><tr><th>Period</th>${COUNT_HEADS}<th>Closed</th><th>Resolve rate</th><th>Chg vs prior</th></tr></thead>
+        <thead><tr><th>Period</th><th>Issues</th><th>Solved</th><th>Resolve rate</th><th>Chg vs prior</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td>Total</td>
-            ${countCells(totals)}
-            <td class="num-cell">${totals.closed}</td>
-            <td><span class="rate-pill ${ratePillClass(totalRate)}">${totalRate}%</span></td>
-            <td></td>
-          </tr>
-        </tfoot>
       </table>
     </div>`;
   }
@@ -465,46 +480,15 @@
     const byHub = {};
     issues.forEach(i=>{
       const hub = i.hub && i.hub !== '—' ? i.hub : 'Unassigned';
-      if(!byHub[hub]) byHub[hub] = { hub, ...emptyCounts(), remarks:0 };
-      tally(byHub[hub], i);
+      if(!byHub[hub]) byHub[hub] = { hub, total:0, remarks:0, solved:0 };
+      byHub[hub].total += 1;
       if(i.remarks && String(i.remarks).trim()) byHub[hub].remarks += 1;
+      if(i.status === 'Resolved') byHub[hub].solved += 1;
     });
-    return Object.values(byHub).map(h => ({ ...h, rate: resolveRate(h) })).sort((a,b)=> b.total - a.total);
-  }
-
-
-  // ---- Shared performance counters (same definitions in KAM Dashboard + OPS Console) ----
-  //  New          = status "Open" (nobody has picked it up yet)
-  //  In progress  = status "In Progress" or "Escalated" (someone is working it)
-  //  SLA breach   = NOT resolved AND the escalation ladder has already flagged it
-  //                 (Need attention / Critical / Very critical = response window missed)
-  //  Resolved     = status "Resolved"
-  const SLA_BREACH_STATES = ['Need attention', 'Critical', 'Very critical'];
-  function emptyCounts(){ return { total:0, fresh:0, progress:0, breach:0, solved:0, closed:0 }; }
-  function tally(c, i){
-    c.total += 1;
-    if(i.closed_by) c.closed += 1;
-    if(i.status === 'Resolved'){ c.solved += 1; return; }
-    if(i.status === 'Open') c.fresh += 1; else c.progress += 1;
-    if(SLA_BREACH_STATES.includes(i.response_status)) c.breach += 1;
-  }
-  function resolveRate(c){ return c.total ? Math.round((c.solved / c.total) * 100) : 0; }
-  const COUNT_HEADS = '<th>Issues</th><th>New</th><th>In progress</th><th>SLA breach</th><th>Resolved</th>';
-  function countCells(c){
-    return `<td class="num-cell">${c.total}</td>
-        <td class="num-cell">${c.fresh}</td>
-        <td class="num-cell">${c.progress}</td>
-        <td class="num-cell ${c.breach ? 'breach-num' : ''}">${c.breach}</td>
-        <td class="num-cell">${c.solved}</td>`;
-  }
-  function countCards(c){
-    return `
-        <div class="stat-card"><div class="num">${c.total}</div><div class="lbl">Total issues</div></div>
-        <div class="stat-card"><div class="num">${c.fresh}</div><div class="lbl">New issues</div></div>
-        <div class="stat-card"><div class="num">${c.progress}</div><div class="lbl">In progress</div></div>
-        <div class="stat-card ${c.breach ? 'breach' : ''}"><div class="num">${c.breach}</div><div class="lbl">SLA breach</div></div>
-        <div class="stat-card"><div class="num">${c.solved}</div><div class="lbl">Resolved</div></div>
-        <div class="stat-card"><div class="num">${resolveRate(c)}%</div><div class="lbl">Resolve rate</div></div>`;
+    return Object.values(byHub).map(h => ({
+      ...h,
+      rate: h.total ? Math.round((h.solved / h.total) * 100) : 0
+    })).sort((a,b)=> b.total - a.total);
   }
 
   function ratePillClass(rate){
@@ -521,9 +505,12 @@
 
     const zoneIssues = allIssues.filter(i => classifyZone(i.zone) === zone);
     const hubStats = computeHubStats(zoneIssues);
-    const totals = emptyCounts();
-    zoneIssues.forEach(i => tally(totals, i));
+    const totalIssues = zoneIssues.length;
+    const totalRemarks = hubStats.reduce((s,h)=>s+h.remarks, 0);
+    const totalSolved = hubStats.reduce((s,h)=>s+h.solved, 0);
     const hubCount = hubStats.length;
+    const avgPerHub = hubCount ? (totalIssues / hubCount).toFixed(1) : '0.0';
+    const overallRate = totalIssues ? Math.round((totalSolved / totalIssues) * 100) : 0;
 
     const content = $('perfContent');
     if(!hubCount){
@@ -534,7 +521,13 @@
     const medalClass = (idx) => idx === 0 ? 'r1' : idx === 1 ? 'r2' : idx === 2 ? 'r3' : '';
 
     content.innerHTML = `
-      <div class="stat-grid">${countCards(totals)}
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num">${totalIssues}</div><div class="lbl">Total issues</div></div>
+        <div class="stat-card"><div class="num">${totalRemarks}</div><div class="lbl">Remarks logged</div></div>
+        <div class="stat-card"><div class="num">${totalSolved}</div><div class="lbl">Solved</div></div>
+        <div class="stat-card"><div class="num">${hubCount}</div><div class="lbl">Hubs reporting</div></div>
+        <div class="stat-card"><div class="num">${avgPerHub}</div><div class="lbl">Avg issues / hub</div></div>
+        <div class="stat-card"><div class="num">${overallRate}%</div><div class="lbl">Overall resolve rate</div></div>
       </div>
 
       <div class="perf-section-title">Hub Leaderboard</div>
@@ -542,7 +535,7 @@
         <table class="perf-table">
           <thead>
             <tr>
-              <th>#</th><th>Hub</th>${COUNT_HEADS}<th>Remarks</th><th>Resolve rate</th>
+              <th>#</th><th>Hub</th><th>Issues</th><th>Remarks</th><th>Solved</th><th>Resolve rate</th>
             </tr>
           </thead>
           <tbody>
@@ -550,8 +543,9 @@
               <tr>
                 <td><span class="rank-badge ${medalClass(idx)}">${idx+1}</span></td>
                 <td>${escapeHtml(h.hub)}</td>
-                ${countCells(h)}
+                <td class="num-cell">${h.total}</td>
                 <td class="num-cell">${h.remarks}</td>
+                <td class="num-cell">${h.solved}</td>
                 <td><span class="rate-pill ${ratePillClass(h.rate)}">${h.rate}%</span></td>
               </tr>
             `).join('')}
@@ -700,24 +694,7 @@
   // Higher severity first (Very critical > Critical > Need attention), and
   // within the same severity, whichever has been stuck longest goes first.
   const SEVERITY_RANK = { 'Very critical': 3, 'Critical': 2, 'Need attention': 1 };
-  // ---- Escalation-ladder counts shown above the Flagged list ----
-  // Counts every still-unresolved issue by the level it currently sits at.
-  // L3 = hub (not flagged yet), L2 = Need attention, L1 = Critical / Very critical.
-  function renderLevelCards(issues){
-    const c = { L1:0, L2:0, L3:0 };
-    issues.forEach(i=>{
-      if(i.status === 'Resolved') return;
-      const lvl = c[i.escalation_level] !== undefined ? i.escalation_level : 'L3';
-      c[lvl] += 1;
-    });
-    $('flaggedLevelCards').innerHTML = `
-      <div class="stat-card lvl-l1"><div class="num">${c.L1}</div><div class="lbl">L1 count</div><div class="sub">Ops Manager · Critical / Very critical</div></div>
-      <div class="stat-card lvl-l2"><div class="num">${c.L2}</div><div class="lbl">L2 count</div><div class="sub">Cluster / Regional · Need attention</div></div>
-      <div class="stat-card"><div class="num">${c.L3}</div><div class="lbl">L3 count</div><div class="sub">Hub · Regular</div></div>`;
-  }
-
   function renderFlagged(){
-    renderLevelCards(allIssues);
     const flagged = allIssues
       .filter(i => SEVERITY_RANK[i.response_status])
       .sort((a, b) => {
@@ -748,7 +725,6 @@
           <span class="tag">${escapeHtml(i.subcategory)}</span>
           <span class="badge ${statusClass(i.status)}">${escapeHtml(i.status)}</span>
           ${renderFlag(i)}
-          ${i.reescalation_count ? `<span class="tag reesc">↻ Re-escalated${i.reescalation_count > 1 ? ' ×' + i.reescalation_count : ''}</span>` : ''}
           ${renderCloseState(i)}
         </div>
         <div class="details-text">${escapeHtml(i.details)}</div>
@@ -765,7 +741,6 @@
             <select data-role="status">
               <option value="Open" ${i.status==='Open'?'selected':''}>Open</option>
               <option value="In Progress" ${i.status==='In Progress'?'selected':''}>In Progress</option>
-              <option value="Escalated" ${i.status==='Escalated'?'selected':''}>Escalated</option>
               <option value="Resolved" ${i.status==='Resolved'?'selected':''}>Resolved</option>
             </select>
           </div>
