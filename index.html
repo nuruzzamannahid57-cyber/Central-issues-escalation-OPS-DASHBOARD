@@ -297,8 +297,6 @@
         <select id="ff-status"><option value="">All statuses</option><option>Open</option><option>In Progress</option><option>Resolved</option></select></div>
       <div class="ff"><label for="ff-flag">Flag</label>
         <select id="ff-flag"><option value="">All flags</option><option>Need attention</option><option>Critical</option><option>Very critical</option></select></div>
-      <div class="ff"><label for="ff-level">Level</label>
-        <select id="ff-level"><option value="">All levels</option><option value="L3">L3 · Hub</option><option value="L2">L2 · Cluster / Regional</option><option value="L1">L1 · Ops Manager</option></select></div>
       <div class="ff grow"><label for="ff-search">Search</label><input type="text" id="ff-search" placeholder="Consignment / merchant / hub / details"></div>
       <div class="ff-meta"><span id="filterCount"></span><button class="link" id="ffClear" type="button">Clear filters</button></div>
     </div>
@@ -750,11 +748,11 @@
 
   // ---------- Filters (Ops Manager / Regional Manager / Cluster Lead) ----------
   let canFilter = false;
-  const FF_IDS = ['ff-zone','ff-hub','ff-category','ff-status','ff-flag','ff-level'];
+  const FF_IDS = ['ff-zone','ff-hub','ff-category','ff-status','ff-flag'];
   function currentFilters(){
     return {
       zone: $('ff-zone').value, hub: $('ff-hub').value, category: $('ff-category').value,
-      status: $('ff-status').value, flag: $('ff-flag').value, level: $('ff-level').value,
+      status: $('ff-status').value, flag: $('ff-flag').value,
       search: $('ff-search').value.trim().toLowerCase()
     };
   }
@@ -768,7 +766,6 @@
       if(f.category && i.category !== f.category) return false;
       if(f.status && i.status !== f.status) return false;
       if(f.flag && i.response_status !== f.flag) return false;
-      if(f.level && (i.escalation_level || 'L3') !== f.level) return false;
       if(f.search){
         const hay = [i.consignment, i.hub, i.details, i.remarks, i.category, i.subcategory].join(' ').toLowerCase();
         if(!hay.includes(f.search)) return false;
