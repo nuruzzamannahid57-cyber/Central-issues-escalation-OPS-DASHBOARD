@@ -76,6 +76,18 @@
     border-radius:8px;cursor:pointer;
   }
   button.link{background:none;border:none;color:var(--accent);font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;padding:0;}
+
+  .ir-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
+  .ir-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;width:100%;max-width:520px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+  .ir-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;}
+  .ir-head h3{font-family:'Inter',sans-serif;font-weight:500;margin:0;font-size:19px;color:var(--text);}
+  .ir-x{background:none;border:none;color:var(--text-faint);font-size:22px;line-height:1;cursor:pointer;padding:0 2px;}
+  .ir-x:hover{color:var(--text);}
+  .ir-meta{font-size:13px;color:var(--text-dim);margin:0 0 8px;}
+  .ir-meta b{color:var(--text);}
+  .ir-box input[type=text]{margin-bottom:10px;}
+  .ir-actions{display:flex;gap:10px;margin-top:14px;}
+  .ir-actions button{flex:1;}
   .status-msg{font-size:13.5px;font-weight:600;}
   .status-msg.err{color:var(--red);}
   .status-msg.ok{color:var(--green);}
@@ -225,6 +237,21 @@
   <div id="lightboxOverlay" class="lightbox-overlay" style="display:none;">
     <button class="lightbox-close" id="lightboxClose">✕</button>
     <img id="lightboxImg" src="" alt="Attachment">
+  </div>
+
+  <div id="irOverlay" class="ir-overlay">
+    <div class="ir-box">
+      <div class="ir-head"><h3>Send to IR team</h3><button class="ir-x" id="irX" type="button" aria-label="Close">✕</button></div>
+      <div class="ir-meta">From: <b id="irFrom"></b></div>
+      <div class="ir-meta">To: <b>issue.resolution@carrybee.com</b></div>
+      <input type="text" id="irSubject" maxlength="200" placeholder="Subject">
+      <textarea id="irDetails" maxlength="3000" style="min-height:160px;" placeholder="Write your message to the IR team"></textarea>
+      <div class="ir-actions">
+        <button class="ghost" id="irBack" type="button">Cancel</button>
+        <button class="primary" id="irSend" type="button">Send</button>
+      </div>
+      <div style="margin-top:10px;"><span class="status-msg" id="irMsg"></span></div>
+    </div>
   </div>
 
   <div id="view-login" class="login-card">
@@ -728,7 +755,8 @@
         <div class="details-text">${escapeHtml(i.details)}</div>
         ${renderAttachments(i)}
         ${i.remarks ? `<div class="prior-remark"><b>Last remark</b> (${escapeHtml(remarksByLabel(i.remarks_by))}, ${fmtTime(i.updated_at)}): ${escapeHtml(i.remarks)}</div>` : ''}
-        ${i.closed_by ? `<div class="prior-remark" style="margin-top:8px;">Permanently closed by the KAM who logged it — no further updates needed.</div>` : `
+        ${i.closed_by ? `<div class="prior-remark" style="margin-top:8px;">Permanently closed by the KAM who logged it — no further updates needed.</div>
+        <div style="margin-top:10px;"><button class="ghost" data-role="ir" type="button">Send to IR</button></div>` : `
         <div class="update-row">
           <div class="field">
             <label>Remark</label>
@@ -743,10 +771,12 @@
             </select>
           </div>
           <button class="primary" data-role="submit">Save update</button>
+          <button class="ghost" data-role="ir" type="button">Send to IR</button>
         </div>
         <div style="margin-top:8px;"><span class="status-msg" data-role="msg"></span></div>
         `}
       `;
+      card.querySelector('[data-role=ir]').addEventListener('click', ()=> openIR(i));
       if (i.closed_by) { list.appendChild(card); return; }
       card.querySelector('[data-role=submit]').addEventListener('click', async ()=>{
         const btn = card.querySelector('[data-role=submit]');
@@ -770,6 +800,43 @@
       list.appendChild(card);
     });
   }
+
+
+  // ---------- Send to IR ----------
+  let irIssue = null;
+  function openIR(i){
+    irIssue = i;
+    $('irFrom').textContent = authEmail || '';
+    $('irSubject').value = `[IR] ${i.consignment || i.id}${i.hub ? ' · ' + i.hub : ''}`;
+    $('irDetails').value = ''; $('irMsg').textContent = ''; $('irMsg').className = 'status-msg';
+    $('irOverlay').style.display = 'flex';
+    $('irSubject').focus();
+  }
+  function closeIR(){ $('irOverlay').style.display = 'none'; irIssue = null; }
+  $('irX').addEventListener('click', closeIR);
+  $('irBack').addEventListener('click', closeIR);
+  $('irOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'irOverlay') closeIR(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && $('irOverlay').style.display !== 'none') closeIR(); });
+  $('irSend').addEventListener('click', async ()=>{
+    const msg = $('irMsg');
+    const subject = $('irSubject').value.trim();
+    const details = $('irDetails').value.trim();
+    if(!subject){ msg.textContent = 'Write a subject.'; msg.className = 'status-msg err'; return; }
+    if(details.length < 3){ msg.textContent = 'Write the message body.'; msg.className = 'status-msg err'; return; }
+    msg.textContent = 'Sending…'; msg.className = 'status-msg';
+    $('irSend').disabled = true;
+    try{
+      const res = await authedFetch(`/api/issues/${encodeURIComponent(irIssue.id)}/send-to-ir`, { method:'POST', body: JSON.stringify({ subject, details }) });
+      const data = await res.json();
+      if(!res.ok){ msg.textContent = data.error || 'Could not send.'; msg.className = 'status-msg err'; return; }
+      msg.textContent = 'Sent to the IR team.'; msg.className = 'status-msg ok';
+      setTimeout(closeIR, 900);
+    }catch(err){
+      msg.textContent = 'Could not reach the server.'; msg.className = 'status-msg err';
+    }finally{
+      $('irSend').disabled = false;
+    }
+  });
 
   if(authToken){ enterConsole(); } else { $('view-login').style.display = 'block'; }
 </script>
