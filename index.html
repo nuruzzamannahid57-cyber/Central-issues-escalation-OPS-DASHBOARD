@@ -130,6 +130,7 @@
   .tab-bar.sub .tab-btn.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
 
   .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px;}
+  #flaggedKpis{grid-template-columns:repeat(3,minmax(0,1fr));}
   .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;}
   .stat-card .num{font-family:'Inter',sans-serif;font-size:25px;font-weight:500;line-height:1.1;}
   .stat-card .lbl{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
@@ -288,13 +289,15 @@
     </div>
 
     <div id="panel-flagged" style="display:none;">
+      <div class="stat-grid" id="flaggedKpis"></div>
       <div id="flaggedList"></div>
       <div id="flaggedEmptyState" class="empty-state" style="display:none;">Nothing flagged right now — everything under you is on time.</div>
     </div>
 
     <div id="panel-performance" style="display:none;">
       <div class="tab-bar sub" id="perfSubTabs">
-        <button class="tab-btn active" data-zone="central">Central / CTG</button>
+        <button class="tab-btn active" data-zone="central">Central</button>
+        <button class="tab-btn" data-zone="ctg">CTG</button>
         <button class="tab-btn" data-zone="isd">ISD &amp; Sub</button>
         <button class="tab-btn" data-zone="osd">OSD</button>
       </div>
@@ -432,7 +435,7 @@
   }
 
   function renderTrendTable(zone, period){
-    const zoneIssues = allIssues.filter(i => classifyZone(i.zone) === zone);
+    const zoneIssues = allIssues.filter(i => classifyIssue(i) === zone);
     const allBuckets = bucketIssues(zoneIssues, period);
     const limit = period === 'day' ? 7 : period === 'week' ? 8 : 6;
     const shown = allBuckets.slice(0, limit);
@@ -469,7 +472,7 @@
   }
 
   function exportPerformanceCSV(zone, hub){
-    let issues = allIssues.filter(i => classifyZone(i.zone) === zone);
+    let issues = allIssues.filter(i => classifyIssue(i) === zone);
     if(hub && hub !== 'all') issues = issues.filter(i => (i.hub && i.hub !== '—' ? i.hub : 'Unassigned') === hub);
     const headers = ['Consignment','Hub','Zone','Category','Subcategory','Status','Logged By','Remarks','Timestamp'];
     const rows = issues.map(i => [
@@ -494,6 +497,13 @@
     URL.revokeObjectURL(url);
   }
 
+  // CTG hubs (CTG-Halishahar, CTG-Patenga, CTG Sub Sort ...) are logged under
+  // the OSD zone, so classify by hub name first, then fall back to the zone.
+  // That gives Central and CTG their own tabs, and keeps CTG out of OSD.
+  function classifyIssue(i){
+    if(/^\s*ctg\b/i.test(i.hub || '')) return 'ctg';
+    return classifyZone(i.zone);
+  }
   function classifyZone(zone){
     const z = (zone||'').toLowerCase();
     if(z.includes('isd') || z.includes('sub')) return 'isd';
@@ -528,7 +538,7 @@
       b.classList.toggle('active', b.dataset.zone === zone);
     });
 
-    const zoneIssues = allIssues.filter(i => classifyZone(i.zone) === zone);
+    const zoneIssues = allIssues.filter(i => classifyIssue(i) === zone);
     const hubStats = computeHubStats(zoneIssues);
     const totalIssues = zoneIssues.length;
     const totalRemarks = hubStats.reduce((s,h)=>s+h.remarks, 0);
@@ -719,6 +729,20 @@
   // Higher severity first (Very critical > Critical > Need attention), and
   // within the same severity, whichever has been stuck longest goes first.
   const SEVERITY_RANK = { 'Very critical': 3, 'Critical': 2, 'Need attention': 1 };
+  // L1 / L2 / L3 KPI cards: how many still-open issues sit at each escalation
+  // level right now (L3 = Hub, L2 = Cluster / Regional, L1 = Ops Manager).
+  function renderFlaggedKpis(){
+    const open = allIssues.filter(i => i.status !== 'Resolved' && !i.closed_by);
+    const n = lvl => open.filter(i => (i.escalation_level || 'L3') === lvl).length;
+    const cards = [
+      ['L1', 'Ops Manager', n('L1'), 'var(--red)'],
+      ['L2', 'Cluster / Regional', n('L2'), 'var(--gold)'],
+      ['L3', 'Hub', n('L3'), 'var(--text)']
+    ];
+    $('flaggedKpis').innerHTML = cards.map(c =>
+      `<div class="stat-card"><div class="num" style="color:${c[3]};">${c[2]}</div><div class="lbl">${c[0]} · ${c[1]}</div></div>`
+    ).join('');
+  }
   function renderFlagged(){
     const flagged = allIssues
       .filter(i => SEVERITY_RANK[i.response_status])
@@ -727,6 +751,7 @@
         if(rankDiff) return rankDiff;
         return new Date(a.level_started_at || a.ts) - new Date(b.level_started_at || b.ts);
       });
+    renderFlaggedKpis();
     renderIssues(flagged, 'flaggedList', 'flaggedEmptyState');
   }
 
